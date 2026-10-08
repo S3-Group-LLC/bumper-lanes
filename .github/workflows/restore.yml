@@ -1,0 +1,120 @@
+name: Restore
+
+# Puts your data back from a backup. Start it from GitHub → Actions → Restore →
+# Run workflow (or ask your agent to run the restore skill, which explains each step).
+#
+# Safety: you must type RESTORE, and in "data" mode a fresh backup of the current
+# state is taken first — so a restore can itself be undone.
+#
+# To roll back CODE or the LIVE SITE instead, use the undo skill (it reverts a pull
+# request or switches Vercel back to an earlier deployment).
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup:
+        description: 'Which backup: "latest", a date like 2026-10-07, or a run ID from the Actions page'
+        required: true
+        default: latest
+      mode:
+        description: '"data" = put rows and files back into THIS project. "full" = rebuild everything in a NEW, empty project (point SUPABASE_DB_URL at it first).'
+        required: true
+        type: choice
+        options: [data, full]
+        default: data
+      confirm:
+        description: Type RESTORE (all capitals) to confirm. Restoring replaces data.
+        required: true
+
+permissions:
+  contents: write # the safety backup tags your code
+  actions: read # find and download saved backups
+  deployments: read
+
+concurrency:
+  group: restore-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  confirm:
+    name: Check confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: You typed RESTORE?
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "RESTORE" ]; then
+            echo "::error::Stopped: type RESTORE (all capitals) in the confirm box to restore. Nothing was changed."
+            exit 1
+          fi
+          echo "Confirmed."
+
+  safety-backup:
+    name: Safety backup of the current state
+    needs: confirm
+    if: inputs.mode == 'data'
+    uses: ./.github/workflows/backup.yml
+    secrets: inherit
+
+  restore:
+    name: Restore data
+    needs: [confirm, safety-backup]
+    # Run after a successful safety backup, or straight away in full mode (no safety backup).
+    if: ${{ !cancelled() && needs.confirm.result == 'success' && (needs.safety-backup.result == 'success' || needs.safety-backup.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Work folder
+        run: echo "IN=$RUNNER_TEMP/restore" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: bash scripts/setup.sh
+
+      - name: Find the backup
+        id: find
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WHICH: ${{ inputs.backup }}
+        run: node scripts/backup/find-backup.mjs "$WHICH" >> "$GITHUB_OUTPUT"
+
+      - name: Download it
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.find.outputs.artifact }}
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ env.IN }}
+
+      - name: Find the Supabase project
+        run: node scripts/backup/supabase-project.mjs "$GITHUB_ENV"
+
+      - name: Restore
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          MODE: ${{ inputs.mode }}
+        run: bash scripts/backup/restore.sh "$IN/data.tar.gz.gpg" --confirm "$CONFIRM" --mode "$MODE"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Restore (${{ inputs.mode }}) from \`${{ steps.find.outputs.artifact }}\`: ${{ job.status }}"
+            if [ "${{ inputs.mode }}" = "data" ]; then
+              echo "A safety backup of the data as it was just before this restore is saved in this run's artifacts."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,69 @@
+name: Checks
+
+# Runs on every pull request, so you know a change is safe before you merge it.
+# Each check shows up on the pull request with a green ✓ or a red ✗:
+#   • Does it build?           — the website compiles and the code follows the rules (lint)
+#   • Do the tests pass?       — every test in tests/ passes (tests are your agent's eyes)
+#   • Is your data protected?  — every database table has Row Level Security
+#   • Any secrets leaked?      — no passwords or keys in your project files
+# A red ✗? Open it to read what went wrong, or ask your agent: "the checks failed — fix it".
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true # a newer push replaces an older run (saves free minutes)
+
+jobs:
+  build:
+    name: Does it build?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: bash scripts/setup.sh
+      - name: Follows the code rules (lint)
+        run: npm run lint
+      - name: Builds the website
+        run: npm run build
+
+  test:
+    name: Do the tests pass?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: bash scripts/setup.sh
+      - name: Run the tests
+        run: npm test
+
+  data:
+    name: Is your data protected?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # No install needed: the check only reads your migration files.
+      - name: Every table has Row Level Security
+        run: node scripts/check-rls.mjs
+
+  secrets:
+    name: Any secrets leaked?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No passwords or keys in the project
+        run: node scripts/check-secrets.mjs

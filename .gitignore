@@ -1,0 +1,23 @@
+# Dependencies (re-installed by scripts/setup.sh)
+/node_modules
+
+# Build output
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets — NEVER commit these. Real values live in Vercel and GitHub settings.
+.env*
+!.env.example
+
+# Supabase local files
+supabase/.temp/
+supabase/.branches/
+
+# Misc
+.DS_Store
+.vercel
+npm-debug.log*
+/coverage

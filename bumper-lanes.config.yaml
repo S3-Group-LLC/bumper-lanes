@@ -1,0 +1,14 @@
+# Bumper Lanes settings. Your agent reads this file; you can change it too.
+
+# Where changes are tested before they go live.
+#   prod-only     — (default) one Supabase database; each pull request gets its own
+#                   preview website, and merging publishes to the live site.
+#   dev-and-prod  — coming in a later version: a second, separate test database.
+environment: prod-only
+
+# Which AI agent you use with this project: claude-code or codex
+agent: claude-code
+
+backups:
+  # How many days to keep each data backup before it is deleted automatically.
+  retention_days: 14

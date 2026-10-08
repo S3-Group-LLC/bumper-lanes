@@ -1,0 +1,41 @@
+{
+  "name": "my-bumper-lanes-project",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "check:skills": "node scripts/check-skills.mjs",
+    "sync:skills": "node scripts/sync-skills.mjs",
+    "check:rls": "node scripts/check-rls.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "share-link": "node scripts/share-link.mjs",
+    "new-skill": "node scripts/new-skill.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.6",
+    "yaml": "^2.9.1"
+  }
+}

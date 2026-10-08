@@ -1,0 +1,100 @@
+name: Database changes
+
+# Applies your database changes (files in supabase/migrations/) to the live database,
+# safely, after you merge them:
+#   1. Safety check — every table has Row Level Security (stops here if not)
+#   2. Backup      — saves your data first (the Backup workflow)
+#   3. Apply       — runs only the changes that haven't been applied yet
+#
+# Your agent never connects to the live database: only this workflow does, using the
+# SUPABASE_DB_URL secret. If a change fails, it is rolled back and nothing after it
+# runs. The backup from step 2 is there if you need to go back further.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write # the backup tags your code
+  deployments: read
+  actions: read
+
+concurrency:
+  group: migrate-${{ github.repository }}
+  cancel-in-progress: false # never stop a database change halfway
+
+jobs:
+  check:
+    name: 1. Safety check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: bash scripts/setup.sh
+
+      - name: Row Level Security is on for every table
+        run: npm run check:rls
+
+      - name: Database is connected
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Can't apply database changes yet: the SUPABASE_DB_URL secret isn't set. Ask your agent to run the doctor skill."
+            exit 1
+          fi
+
+  backup:
+    name: 2. Backup
+    needs: check
+    uses: ./.github/workflows/backup.yml
+    secrets: inherit
+
+  migrate:
+    name: 3. Apply database changes
+    needs: backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Install the Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Changes waiting to be applied
+        run: supabase migration list --db-url "$SUPABASE_DB_URL"
+
+      - name: Apply
+        id: apply
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            if [ "${{ steps.apply.outcome }}" = "success" ]; then
+              echo "## ✅ Database changes applied"
+              echo "A backup was saved first: \`${{ needs.backup.outputs.artifact }}\`."
+            else
+              echo "## ❌ A database change failed"
+              echo "The failing change was rolled back, and no later changes were applied."
+              echo "A backup from just before is saved: \`${{ needs.backup.outputs.artifact }}\`."
+              echo "Ask your agent: \"the database change failed — what went wrong?\" (it can read this log)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

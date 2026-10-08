@@ -1,0 +1,121 @@
+name: Backup
+
+# Saves three things, so any mistake can be undone:
+#   1. Code       — a tag backup/YYYY-MM-DD pointing at your live code (main)
+#   2. Live site  — recent live deployments + the NAMES of your settings (never values)
+#   3. Data       — database (roles, structure, rows) + stored files, encrypted with
+#                   BACKUP_PASSPHRASE, kept for backups.retention_days days
+#
+# Runs every night, whenever you (or the backup-now skill) start it, and automatically
+# before every database change and every restore (they call this workflow first).
+#
+# Secrets (GitHub → Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL        Session pooler connection string (Supabase → Connect)
+#   BACKUP_PASSPHRASE      a long password you choose; keep a copy somewhere safe
+#   SUPABASE_ACCESS_TOKEN  needed to back up stored files (supabase.com/dashboard/account/tokens)
+#   SUPABASE_PROJECT_REF   optional — worked out from SUPABASE_DB_URL if missing
+
+on:
+  schedule:
+    - cron: "23 7 * * *" # every day at 07:23 UTC (night-time in the Americas)
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact:
+        description: Name of the saved backup
+        value: ${{ jobs.backup.outputs.artifact }}
+
+permissions:
+  contents: write # create the backup/YYYY-MM-DD tag
+  deployments: read # read the list of live-site deployments
+
+jobs:
+  backup:
+    name: Back up code, live site and data
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: backup-${{ github.repository }}
+      cancel-in-progress: false
+    outputs:
+      artifact: ${{ steps.save.outputs.artifact }}
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Work folder
+        run: echo "OUT=$RUNNER_TEMP/backup" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: bash scripts/setup.sh
+
+      - name: "1. Code: tag today's live code"
+        run: |
+          git fetch --quiet origin main
+          tag="backup/$(date -u +%Y-%m-%d)"
+          git tag -f "$tag" origin/main
+          # Moves today's tag if it already exists; earlier days' tags are never changed.
+          git push --quiet origin "+refs/tags/$tag"
+          echo "Tagged $(git rev-parse --short origin/main) as $tag"
+
+      - name: "2. Live site: deployments and setting names"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/backup/site-info.mjs "$OUT/site"
+
+      - name: Find the Supabase project
+        if: env.SUPABASE_DB_URL != ''
+        run: node scripts/backup/supabase-project.mjs "$GITHUB_ENV"
+
+      - name: Install the Supabase CLI
+        if: env.SUPABASE_DB_URL != ''
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: "3. Data: database and files (encrypted)"
+        if: env.SUPABASE_DB_URL != ''
+        run: bash scripts/backup/backup.sh "$OUT"
+
+      - name: "3. Data: skipped"
+        if: env.SUPABASE_DB_URL == ''
+        run: echo "::notice::Data not backed up yet — add the SUPABASE_DB_URL and BACKUP_PASSPHRASE secrets to switch it on."
+
+      - name: Save the backup
+        id: save
+        run: |
+          days="$(node -e 'const {parse}=require("yaml");const c=parse(require("fs").readFileSync("bumper-lanes.config.yaml","utf8"))||{};console.log(Number(c?.backups?.retention_days)||14)')"
+          kind=backup; [ -f "$OUT/data.tar.gz.gpg" ] || kind=backup-nodata
+          echo "artifact=$kind-$(date -u +%Y-%m-%d)-run${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+          echo "days=$days" >> "$GITHUB_OUTPUT"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.save.outputs.artifact }}
+          path: ${{ env.OUT }}
+          retention-days: ${{ steps.save.outputs.days }}
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          {
+            echo "## Backup saved: \`${{ steps.save.outputs.artifact }}\`"
+            echo "Kept for ${{ steps.save.outputs.days }} days."
+            if [ -f "$OUT/backup-info.json" ]; then
+              echo '```json'; cat "$OUT/backup-info.json"; echo '```'
+            else
+              echo "Data: not included (Supabase not connected yet)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
