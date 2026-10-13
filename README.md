@@ -24,9 +24,15 @@ install.
    **Create a new repository**. Choose **Private**.
 2. **Put it online.** In Vercel, click **Add New → Project** and import your new
    repository. Vercel gives you a web address for your live site.
-3. **Add a database.** In your Vercel project, open **Storage** and connect
-   **Supabase**. This fills in the database settings for you.
-4. **Open it with your agent** — pick one:
+3. **Add a database.** In Supabase, create a **New project** (turn **off**
+   "Automatically expose new tables", turn **on** "Enable automatic RLS"). Then,
+   in Vercel → **Settings → Environment Variables**, add
+   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
+   **Redeploy**. Your site's **/status** page will say **Database: Connected**.
+4. **Turn on backups.** In GitHub → **Settings → Secrets and variables →
+   Actions**, add `SUPABASE_DB_URL`, `BACKUP_PASSPHRASE` and
+   `SUPABASE_ACCESS_TOKEN` (the guides show where to find each one).
+5. **Open it with your agent** — pick one:
 
    **Claude Code** — go to **claude.ai/code**, connect GitHub, and pick your
    repository. That's it: setup runs by itself when the session starts (the
@@ -39,7 +45,7 @@ install.
    - If you see **Set package versions**, choose **Node.js 22**.
    - Save, then start a task in that environment.
 
-5. **Say hello.** Ask your agent: **"Run start-my-project."** It will interview
+6. **Say hello.** Ask your agent: **"Run start-my-project."** It will interview
    you about your idea and write it down in `PROJECT.md`.
 
 Stuck? Ask your agent to **"run doctor"** — it checks your setup and tells you

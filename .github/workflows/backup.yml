@@ -82,7 +82,7 @@ jobs:
         if: env.SUPABASE_DB_URL != ''
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       - name: "3. Data: database and files (encrypted)"
         if: env.SUPABASE_DB_URL != ''

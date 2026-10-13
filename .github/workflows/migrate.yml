@@ -75,7 +75,7 @@ jobs:
       - name: Install the Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       - name: Changes waiting to be applied
         run: supabase migration list --db-url "$SUPABASE_DB_URL"
