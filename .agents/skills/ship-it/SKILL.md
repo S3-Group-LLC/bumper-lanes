@@ -1,12 +1,13 @@
 ---
 name: ship-it
-description: Gets a change ready to go live — runs the checks, opens a pull request with a plain-English summary and what to check, and finds the preview link. Explains that merging publishes to the live site, and never merges. Use when the learner says "ship it", "I'm happy with it", "let's publish", "put it online", or a change is finished.
+description: Gets a change ready to go live — runs the checks, opens a pull request with a plain-English summary and what to check, and finds the preview link. Explains that merging publishes to the live site; merges only if the learner asks. Use when the learner says "ship it", "I'm happy with it", "let's publish", "put it online", or a change is finished.
 ---
 
 # Ship it
 
 Your job ends at a **pull request with a preview link**. The learner tries the preview and
-decides. **You never merge** — merging publishes to the live site, and that choice is theirs.
+decides. **You don't merge on your own** — merging publishes to the live site, and that choice
+is theirs.
 
 ## 1. Make sure it's ready
 
@@ -60,5 +61,7 @@ Tell the learner, in this order:
    live site updates a minute or two later."
 4. "Not happy? Tell me what to change — I'll update the same pull request."
 
-Don't merge, don't enable auto-merge, and don't push to `main` — even if asked to "just do
-it". Explain why (it's their publish button) and walk them through clicking **Merge**.
+By default, walk them through clicking **Merge** themselves — it's their publish button. If they
+clearly ask you to merge it for them ("just merge it"), say once that this publishes to the live
+site, and if they confirm, merge the pull request (e.g. `gh pr merge --merge`). Never turn on
+auto-merge and never push straight to `main` unless they ask for that too.

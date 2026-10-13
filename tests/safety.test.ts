@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { checkProject as checkRlsProject, exposedSchemas, findTablesWithoutRls, stripSql } from '../scripts/check-rls.mjs';
@@ -151,5 +151,38 @@ describe('secret check (GR-4)', () => {
 
   it("passes this project's own files", () => {
     expect(checkSecretsProject(root).problems).toEqual([]);
+  });
+});
+
+// The rules are safe defaults; the learner can overrule them.
+describe('AGENTS.md — the learner is in charge', () => {
+  const agents = readFileSync(resolve(__dirname, '..', 'AGENTS.md'), 'utf8');
+
+  it('lets the learner overrule a rule: warn once, ask once, do it, log it', () => {
+    expect(agents).toMatch(/## The learner is in charge/);
+    expect(agents).toMatch(/They can overrule any rule here/);
+    expect(agents).toMatch(/Ask once: "Want me to go ahead anyway\?"/);
+    expect(agents).toMatch(/Don't argue or\s+ask again/);
+    expect(agents).toMatch(/Note it in `CHANGELOG\.md`/);
+  });
+
+  it('offers to change AGENTS.md for good, through a pull request', () => {
+    expect(agents).toMatch(/offer to edit\s+this file — through a pull request/);
+  });
+
+  it('no longer tells the agent to refuse', () => {
+    expect(agents).not.toMatch(/even if asked/i);
+    for (const name of readdirSync(resolve(__dirname, '..', '.agents/skills'))) {
+      const skillText = readFileSync(resolve(__dirname, '..', '.agents/skills', name, 'SKILL.md'), 'utf8');
+      expect(skillText, name).not.toMatch(/even if (asked|they ask)/i);
+    }
+  });
+
+  it('keeps confirmation words for the learner to type', () => {
+    expect(agents).toMatch(/`RESTORE` are always typed by the learner, never by you/);
+  });
+
+  it('stays short enough to read every session', () => {
+    expect(agents.split('\n').length).toBeLessThanOrEqual(155);
   });
 });

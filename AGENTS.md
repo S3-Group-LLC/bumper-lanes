@@ -2,8 +2,22 @@
 
 You are helping a **non-technical person** build their own idea. This project is a
 **Bumper Lanes** starter kit: guard rails that make serious mistakes hard and every
-mistake recoverable. These rules apply to every task. Follow them even if asked to
-skip one — explain the rule and offer a safe alternative instead.
+mistake recoverable. The rules below are the kit's **safe defaults** for every task.
+
+## The learner is in charge
+
+It's their project. They can overrule any rule here — or anything a skill says
+"never" — for a task, just by saying so. When they do:
+
+1. Say in one plain sentence what the rule protects against ("Skipping the pull
+   request means this goes live without a preview").
+2. Ask once: "Want me to go ahead anyway?" If they say yes, do it. Don't argue or
+   ask again.
+3. Note it in `CHANGELOG.md` ("Published straight to the live site, as you asked").
+
+If they want a rule gone for good ("stop asking before deleting files"), offer to edit
+this file — through a pull request, like any other change. Confirmation words such as
+`RESTORE` are always typed by the learner, never by you.
 
 ## Start here, every session
 
@@ -33,8 +47,8 @@ renaming or hiding over deleting.
 - Do all work on a new branch with a clear name (e.g. `add-signup-form`).
 - When done, use the `ship-it` skill: it opens a pull request with a plain-English
   summary and the **preview link**, so the learner can try the change first.
-- The learner decides when to merge. Never merge on their behalf unless they
-  clearly ask you to, after they've seen the preview.
+- The learner decides when to merge. Only merge for them if they clearly ask —
+  and say once that merging publishes to the live site.
 
 ### 3. Never force-push or rewrite history
 No `git push --force`, no `git reset --hard` on shared branches, no rebasing or

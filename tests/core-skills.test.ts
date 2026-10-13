@@ -113,10 +113,13 @@ describe('core skills keep their promises', () => {
     expect(s).not.toMatch(/curl |fetch\(|gh api/);
   });
 
-  it('ship-it never merges', () => {
+  it("ship-it doesn't merge on its own, but merges if the learner clearly asks", () => {
     const s = skill('ship-it');
-    expect(s).not.toMatch(/gh pr merge|--auto|git push origin main/);
-    expect(s).toMatch(/\*\*You never merge\*\*/);
+    expect(s).toMatch(/\*\*You don't merge on your own\*\*/);
+    expect(s).toMatch(/If they\s+clearly ask you to merge it for them/);
+    expect(s).toMatch(/say once that this publishes to the live\s+site/);
+    expect(s).not.toMatch(/even if asked/i);
+    expect(s).not.toMatch(/--auto|git push origin main/);
     expect(s).toMatch(/Merging = publishing/);
   });
 
