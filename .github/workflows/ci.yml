@@ -6,6 +6,8 @@ name: Checks
 #   • Do the tests pass?       — every test in tests/ passes (tests are your agent's eyes)
 #   • Is your data protected?  — every database table has Row Level Security
 #   • Any secrets leaked?      — no passwords or keys in your project files
+#   • Database heads-up        — if a pull request changes the database but GitHub can't
+#                                apply it yet, posts a plain-English warning (never blocks)
 # A red ✗? Open it to read what went wrong, or ask your agent: "the checks failed — fix it".
 
 on:
@@ -67,3 +69,30 @@ jobs:
       - uses: actions/checkout@v4
       - name: No passwords or keys in the project
         run: node scripts/check-secrets.mjs
+
+  database:
+    name: Database heads-up
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # to post the warning
+    steps:
+      - uses: actions/checkout@v4
+      - name: Can GitHub apply this database change after merge?
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
+          node scripts/db-ready.mjs pr "$RUNNER_TEMP/changed.txt" > "$RUNNER_TEMP/warning.md"
+          if [ ! -s "$RUNNER_TEMP/warning.md" ]; then echo "Nothing to warn about."; exit 0; fi
+          cat "$RUNNER_TEMP/warning.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning title=Database not connected::This pull request changes the database, but GitHub can't apply it yet. See the comment on the pull request."
+          if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[].body' | grep -qF '<!-- bumper-lanes:db-not-ready -->'; then
+            echo "The warning is already on the pull request."
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F "body=@$RUNNER_TEMP/warning.md" > /dev/null || echo "Couldn't post the warning comment."
+          fi

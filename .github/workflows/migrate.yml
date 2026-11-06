@@ -14,7 +14,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "supabase/migrations/**"
+      - "supabase/migrations/*.sql"
   workflow_dispatch:
 
 permissions:
@@ -30,6 +30,8 @@ jobs:
   check:
     name: 1. Safety check
     runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.connected.outputs.ready }}
     steps:
       - name: Get the code
         uses: actions/checkout@v4
@@ -46,18 +48,19 @@ jobs:
       - name: Row Level Security is on for every table
         run: npm run check:rls
 
+      # Not connected yet? A brand-new copy of the kit gets a friendly note (nothing to
+      # apply until it is); changes of your own fail here, with what to do.
       - name: Database is connected
+        id: connected
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Can't apply database changes yet: the SUPABASE_DB_URL secret isn't set. Ask your agent to run the doctor skill."
-            exit 1
-          fi
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: node scripts/db-ready.mjs migrate
 
   backup:
     name: 2. Backup
     needs: check
+    if: needs.check.outputs.ready == 'true'
     uses: ./.github/workflows/backup.yml
     secrets: inherit
 
@@ -83,6 +86,15 @@ jobs:
       - name: Apply
         id: apply
         run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
+      # The backup above may have run before the kit's backup-status table existed.
+      - name: Record the backup for the /status page
+        if: steps.apply.outcome == 'success'
+        env:
+          INFO: ${{ needs.backup.outputs.info }}
+        run: |
+          printf '%s' "$INFO" > "$RUNNER_TEMP/backup-info.json"
+          node scripts/backup/record-backup.mjs "$RUNNER_TEMP/backup-info.json"
 
       - name: Summary
         if: always()

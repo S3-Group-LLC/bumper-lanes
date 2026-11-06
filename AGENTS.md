@@ -13,7 +13,8 @@ It's their project. They can overrule any rule here — or anything a skill says
    request means this goes live without a preview").
 2. Ask once: "Want me to go ahead anyway?" If they say yes, do it. Don't argue or
    ask again.
-3. Note it in `CHANGELOG.md` ("Published straight to the live site, as you asked").
+3. Note it in `CHANGELOG.md` ("Published straight to the live site, as you asked")
+   and add an entry to `DECISIONS.md` saying why.
 
 If they want a rule gone for good ("stop asking before deleting files"), offer to edit
 this file — through a pull request, like any other change. Confirmation words such as
@@ -89,9 +90,12 @@ Restoring a backup, wiping data, or anything that can't be undone with a new
 commit needs the learner to type a confirmation word (e.g. `RESTORE`). A "yes"
 or "sure" is not enough.
 
-### 8. Keep `CHANGELOG.md` up to date, in plain English
+### 8. Keep `CHANGELOG.md` and `DECISIONS.md` up to date, in plain English
 Add an entry under today's date for every change you make, written for the
-learner, not a developer ("Added a sign-up form on the home page").
+learner, not a developer ("Added a sign-up form on the home page"). For each
+significant decision — a tool or library, how data is organised, a security or
+privacy choice, a skipped rule — add a `DECISIONS.md` entry: why, other options,
+trade-offs (format at the top of that file).
 
 ## Skills (ask for them by name)
 
@@ -121,18 +125,19 @@ renaming or removing a skill, run `npm run sync:skills`, then `npm run check:ski
 - **Pages:** `src/app/` (home `page.tsx`, health check `status/page.tsx`). Helpers in `src/lib/`.
 - **Tests:** Vitest, in `tests/`.
 - **Commands:** `npm run dev` (run locally) · `npm test` · `npm run lint` · `npm run build`.
-- **Setup:** `scripts/setup.sh` installs everything. It runs automatically in Claude Code
-  and is the "Setup script" in Codex. Run it again if `node_modules` is missing.
+- **Setup:** `scripts/setup.sh` installs everything (in the cloud, also `gh` and `supabase`).
+  It runs by itself in Claude Code and is Codex's install script. Re-run it if anything's missing.
 - **Hosting:** Vercel. Every pull request gets a preview link; `main` is the live site.
 - **Backups:** `.github/workflows/backup.yml` (nightly, manual, and before database changes) and
   `restore.yml` (needs the word `RESTORE`). Use the `backup-now`, `restore` and `undo` skills.
+  Not switched on yet? `npm run connect-backups` sets the GitHub secrets, or explains how.
 - **Data:** Supabase. Settings come from `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (set in Vercel).
 
 ## Working in the cloud
 
-- Your internet access may be limited once a session starts. Dependencies are
-  installed up front by `scripts/setup.sh`.
+- Internet may be limited once a session starts; `scripts/setup.sh` installs everything
+  up front. Can't reach GitHub, Supabase or Vercel? `doctor` lists the domains to allow.
 - Adding a package: ask the learner first and explain why. If the install fails
   for lack of internet, explain that it will install on the next session start
   (Codex: after the setup script runs again).

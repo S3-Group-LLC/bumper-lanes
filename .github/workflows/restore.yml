@@ -101,7 +101,10 @@ jobs:
           path: ${{ env.IN }}
 
       - name: Find the Supabase project
-        run: node scripts/backup/supabase-project.mjs "$GITHUB_ENV"
+        # Only this step sees the key secret; it passes it on (masked) to later steps.
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/backup/supabase-project.mjs "$GITHUB_ENV" restore
 
       - name: Restore
         env:

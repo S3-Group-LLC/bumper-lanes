@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { buildShareLink, parseProject, MAX_URL_LENGTH, SHARE_URL } from '../scripts/share-link.mjs';
+import { buildShareLink, markdownLink, parseProject, MAX_URL_LENGTH, SHARE_URL } from '../scripts/share-link.mjs';
 import { configProblems, projectIsPlaceholder, runChecks, formatReport } from '../scripts/doctor.mjs';
 
 const root = resolve(__dirname, '..');
@@ -62,6 +63,34 @@ describe('share link (start-my-project)', () => {
     expect(brief.length).toBeGreaterThan(5000); // copy-paste version is complete
   });
 
+  it('leaves "Later ideas" out of the link before cutting anything else (copy-paste keeps it)', () => {
+    const withLater = PROJECT.replace('- _Good ideas for after the first version_', `- ${'Payments, reminders and gift cards. '.repeat(40)}`);
+    const { url, brief, shortened } = buildShareLink(withLater);
+    const linked = new URL(url).searchParams.get('brief')!;
+    expect(shortened).toBe(true);
+    expect(linked).not.toContain('Later ideas');
+    expect(linked).toContain('First version:');
+    expect(linked.endsWith('…')).toBe(false);
+    expect(brief).toContain('Later ideas:');
+  });
+
+  it('shows the link as a short label, and the plain link only when asked', () => {
+    expect(markdownLink('https://x.test/?a=1')).toBe('[**Send my idea to S3 →**](https://x.test/?a=1)');
+    const dir = mkdtempSync(join(tmpdir(), 'share-'));
+    try {
+      writeFileSync(join(dir, 'PROJECT.md'), PROJECT);
+      const run = (...args: string[]) =>
+        spawnSync('node', [join(root, 'scripts/share-link.mjs'), dir, ...args], { encoding: 'utf8' }).stdout;
+      const out = run();
+      expect(out).toMatch(/^\[\*\*Send my idea to S3 →\*\*\]\(https:\/\/hellos3\.com\/bumper-lanes\/share\?v=1&/m);
+      expect(out).not.toMatch(/^https:\/\/hellos3\.com\/bumper-lanes\/share\?/m); // no bare wall of URL
+      expect(out).toContain('Copy-paste version');
+      expect(run('--raw')).toMatch(/^Plain link:\nhttps:\/\/hellos3\.com\/bumper-lanes\/share\?v=1&/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('refuses to build a link from the placeholder', () => {
     expect(() => buildShareLink(readFileSync(join(root, 'PROJECT.md'), 'utf8'))).toThrow(/start-my-project/);
   });
@@ -90,14 +119,14 @@ describe('doctor checks', () => {
       cpSync(join(root, '.agents'), join(dir, '.agents'), { recursive: true, verbatimSymlinks: true });
       cpSync(join(root, '.claude'), join(dir, '.claude'), { recursive: true, verbatimSymlinks: true });
       writeFileSync(join(dir, 'PROJECT.md'), PROJECT);
-      const results = runChecks(dir, {});
+      const results = runChecks(dir, {}, { listSecrets: () => null });
       const byTitle = Object.fromEntries(results.map((r: { title: string; status: string }) => [r.title, r.status]));
       expect(byTitle['PROJECT.md']).toBe('ok');
       expect(byTitle['bumper-lanes.config.yaml']).toBe('ok');
       expect(byTitle['Supabase settings for the app']).toBe('check');
       expect(byTitle['Project set up']).toBe('fail'); // no node_modules in the copy
       expect(formatReport(results)).toMatch(/→ Run: bash scripts\/setup\.sh/);
-      const withEnv = runChecks(dir, { NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'k' });
+      const withEnv = runChecks(dir, { NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'k' }, { listSecrets: () => null });
       expect(withEnv.find((r: { title: string }) => r.title === 'Supabase settings for the app')!.status).toBe('ok');
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -109,6 +138,8 @@ describe('core skills keep their promises', () => {
   it('start-my-project never sends anything itself', () => {
     const s = skill('start-my-project');
     expect(s).toMatch(/npm run share-link/);
+    expect(s).toMatch(/exactly as printed/);
+    expect(s).toMatch(/\*\*Send my idea to S3 →\*\*/);
     expect(s).toMatch(/Don't send anything yourself, don't open the\s+link for them, and don't call any website/);
     expect(s).not.toMatch(/curl |fetch\(|gh api/);
   });

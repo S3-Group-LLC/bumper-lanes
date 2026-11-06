@@ -60,7 +60,10 @@ Ask exactly once, without pressure:
 > nothing is sent unless you open it and press submit."
 
 **Only if they say yes:** run `npm run share-link` (or `node scripts/share-link.mjs`) and give
-them the link and the copy-paste text it prints. Don't send anything yourself, don't open the
+them the link and the copy-paste text it prints. Show the link **exactly as printed**: it appears as a short
+label, **Send my idea to S3 →**, not a long web address. Only show the plain address if
+they ask, or if the label doesn't work for them (`npm run share-link -- --raw` prints it).
+Don't send anything yourself, don't open the
 link for them, and don't call any website — the link is the whole mechanism. If they say no,
 move on happily.
 

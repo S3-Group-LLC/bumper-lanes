@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "^20.9.0 || 22.x || 24.x"
   },
   "scripts": {
     "setup": "bash scripts/setup.sh",
@@ -17,6 +17,7 @@
     "check:rls": "node scripts/check-rls.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "doctor": "node scripts/doctor.mjs",
+    "connect-backups": "node scripts/connect-backups.mjs",
     "share-link": "node scripts/share-link.mjs",
     "new-skill": "node scripts/new-skill.mjs"
   },

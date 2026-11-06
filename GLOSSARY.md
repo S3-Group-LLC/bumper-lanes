@@ -14,6 +14,7 @@ words here when it explains something (the `explain-that` skill).
 - **Commit** — a saved snapshot of changes, with a note saying what changed.
 - **Context window** — how much an agent can hold in mind at once.
 - **Database** — where your app keeps information between visits; yours is Supabase.
+- **DECISIONS.md** — a plain-English record of why your project is the way it is: each big choice, the other options and the trade-offs.
 - **Deployment** — one version of your website put online by Vercel.
 - **Environment variable** — a named setting (like a database address) kept outside the code. Secret ones live in Vercel or GitHub settings, never in the code.
 - **Lint** — an automatic check that code follows the agreed rules.

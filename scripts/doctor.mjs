@@ -5,7 +5,8 @@
 //
 // Things that live outside the project — GitHub secrets, Vercel settings, whether
 // Supabase is awake — are checked by the doctor skill itself, or with click-by-click steps.
-import { execFileSync } from 'node:child_process';
+// In the cloud it also tests which websites your agent can reach (cloud-check.mjs).
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,9 @@ import { parse } from 'yaml';
 import { checkProject as checkSkills } from './check-skills.mjs';
 import { checkProject as checkRls } from './check-rls.mjs';
 import { checkProject as checkSecrets } from './check-secrets.mjs';
+import { supabaseSettingProblems } from '../src/lib/supabase-settings.mjs';
+import { SECRETS, existingSecrets, secretIsSet } from './connect-backups.mjs';
+import { networkCheck, placeCheck, toolsCheck, whereAmIWorking } from './cloud-check.mjs';
 
 const ok = (title, detail = '') => ({ status: 'ok', title, detail });
 const warn = (title, detail, fix) => ({ status: 'warn', title, detail, fix });
@@ -53,11 +57,31 @@ function git(root, ...args) {
   }
 }
 
-export function runChecks(root, env = process.env) {
+/** Are backups switched on? Uses the GitHub CLI if it's signed in (names only, never values). */
+export function backupCheck(have) {
+  if (!have) {
+    return {
+      status: 'check',
+      title: 'Backups',
+      detail: "can't see the GitHub secrets from here",
+      fix: 'Ask the learner to look at GitHub → Actions → Backup (the doctor skill explains), or run: npm run connect-backups -- --check',
+    };
+  }
+  const missing = SECRETS.filter((n) => !secretIsSet(have, n));
+  return missing.length
+    ? warn('Backups', `not switched on yet (missing ${missing.join(', ')})`, 'Takes about 5 minutes: run npm run connect-backups (or ask: "connect backups").')
+    : ok('Backups', 'switched on (the GitHub secrets are set)');
+}
+
+const hasTool = (name) => spawnSync('sh', ['-c', `command -v ${name}`], { stdio: 'ignore' }).status === 0;
+
+export function runChecks(root, env = process.env, { listSecrets = () => existingSecrets(undefined, root) } = {}) {
   const results = [];
   const read = (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), 'utf8') : null);
 
-  // Tools
+  // Where, and tools
+  const place = whereAmIWorking(env);
+  results.push(placeCheck(place));
   const [major, minor] = process.versions.node.split('.').map(Number);
   results.push(
     major > 20 || (major === 20 && minor >= 9)
@@ -122,16 +146,23 @@ export function runChecks(root, env = process.env) {
     results.push(warn('Working on main', 'there are unsaved changes directly on main (the live site)', 'Move them to a branch and use ship-it to open a pull request.'));
   } else results.push(ok('Git', `on branch ${branch}`));
 
+  if (!place.endsWith('local')) results.push(toolsCheck(hasTool));
+  results.push(backupCheck(listSecrets()));
+
   // Supabase settings as seen from here (usually not set inside an agent's workspace)
   // Same names the app reads (src/lib/health.ts).
   const hasUrl = Boolean(env.NEXT_PUBLIC_SUPABASE_URL?.trim());
   const hasKey = Boolean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim());
+  const settingProblems = supabaseSettingProblems(env);
   results.push(
-    !hasUrl || !hasKey
+    settingProblems.length
+      ? fail('Supabase settings for the app', settingProblems.join(' '), 'Fix them where they are set (Vercel → Settings → Environment Variables, or .env.local), then redeploy.')
+      : !hasUrl || !hasKey
       ? {
           status: 'check',
           title: 'Supabase settings for the app',
-          detail: 'not visible from here (normal — they live in Vercel)',
+          detail:
+            "not visible from here (normal — they live in Vercel, and the Supabase integration marks them Sensitive, so nobody can read them back)",
           fix: 'Open your live site\'s /status page to check them (the doctor skill explains how).',
         }
       : ok('Supabase settings for the app', 'set in this workspace'),
@@ -153,5 +184,9 @@ export function formatReport(results) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = resolve(process.argv[2] ?? join(fileURLToPath(import.meta.url), '..', '..'));
-  console.log(formatReport(runChecks(root)));
+  const results = runChecks(root);
+  // In the cloud (or unsure), test which websites the agent can reach.
+  const place = whereAmIWorking();
+  if (!place.endsWith('local')) results.push(await networkCheck(place));
+  console.log(formatReport(results));
 }

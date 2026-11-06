@@ -6,7 +6,10 @@ import { join, resolve } from 'node:path';
 import { clearTablesSql, filterData, fixRoles, fixSchema, stripMetaCommands, userSchemas } from '../scripts/backup/prepare-restore.mjs';
 import { pickBackup } from '../scripts/backup/find-backup.mjs';
 import { deployments, envExampleNames, settingsNames } from '../scripts/backup/site-info.mjs';
-import { projectRef, secretKey } from '../scripts/backup/supabase-project.mjs';
+import { projectRef, secretKey, storageAccess } from '../scripts/backup/supabase-project.mjs';
+import { incompleteReason } from '../scripts/backup/check-complete.mjs';
+import { explainStorageError } from '../scripts/backup/storage.mjs';
+import { explainRecordError, recordValues } from '../scripts/backup/record-backup.mjs';
 
 const DATA = [
   "SELECT pg_catalog.set_config('search_path', '', false);",
@@ -35,6 +38,11 @@ const DATA = [
 ].join('\n');
 
 describe('prepare-restore: only your data is restored', () => {
+  it("never overwrites the kit's record of past backups", () => {
+    const withRuns = 'COPY "bumper_lanes"."backup_runs" ("run_id") FROM stdin;\nr1\n\\.\n';
+    expect(filterData(withRuns, ['public', 'bumper_lanes']).tables).toEqual([]);
+  });
+
   const { sql, tables } = filterData(DATA, ['public', 'auth']);
 
   it('keeps public tables and user accounts', () => {
@@ -177,6 +185,90 @@ describe('supabase-project', () => {
   });
 });
 
+describe('stored files: three secrets, and no silent gaps', () => {
+  const ref = 'abcdefghijklmnopqrst';
+  const db = `postgresql://postgres.${ref}:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres`;
+  const noFetch = vi.fn();
+
+  it('uses SUPABASE_SECRET_KEY (or the older SUPABASE_SERVICE_ROLE_KEY) — no access token needed', async () => {
+    const fake = 'sb_secret_' + 'x'.repeat(8);
+    expect(await storageAccess({ SUPABASE_DB_URL: db, SUPABASE_SECRET_KEY: fake }, noFetch)).toEqual({
+      url: `https://${ref}.supabase.co`,
+      key: fake,
+      problem: null,
+    });
+    expect((await storageAccess({ SUPABASE_DB_URL: db, SUPABASE_SERVICE_ROLE_KEY: fake }, noFetch)).key).toBe(fake);
+    expect(noFetch).not.toHaveBeenCalled();
+  });
+
+  it('older setups with SUPABASE_ACCESS_TOKEN keep working', async () => {
+    const fetchImpl = vi.fn(async () => Response.json([{ type: 'secret', api_key: 'sb_secret_from_api' }]));
+    expect((await storageAccess({ SUPABASE_DB_URL: db, SUPABASE_ACCESS_TOKEN: 't' }, fetchImpl)).key).toBe('sb_secret_from_api');
+  });
+
+  it('a rejected access token, a publishable key or no key at all is a problem, in plain English', async () => {
+    const rejected = await storageAccess({ SUPABASE_DB_URL: db, SUPABASE_ACCESS_TOKEN: 't' }, vi.fn(async () => new Response('', { status: 401 })));
+    expect(rejected.problem).toMatch(/401.*not accepted.*SUPABASE_SECRET_KEY/);
+    expect((await storageAccess({ SUPABASE_DB_URL: db, SUPABASE_SECRET_KEY: 'sb_publishable_abc' }, noFetch)).problem).toMatch(/publishable key/);
+    expect((await storageAccess({ SUPABASE_DB_URL: db }, noFetch)).problem).toMatch(/SUPABASE_SECRET_KEY isn't set.*connect backups/);
+    expect((await storageAccess({ SUPABASE_DB_URL: 'postgresql://nope' }, noFetch)).problem).toMatch(/Session pooler/);
+  });
+
+  it('a backup without its stored files fails at the end, saying why', () => {
+    const info = { dry_run: false, database: true, files_included: false, storage_error: 'Storage download failed: boom' };
+    expect(incompleteReason(info, {})).toBe('Storage download failed: boom');
+    expect(incompleteReason(info, { STORAGE_PROBLEM: "SUPABASE_SECRET_KEY isn't set." })).toMatch(/isn't set/);
+    expect(incompleteReason({ ...info, files_included: true }, {})).toBeNull();
+    expect(incompleteReason({ ...info, dry_run: true }, {})).toBeNull();
+  });
+
+  it('a rejected key is called out by name', () => {
+    expect(explainStorageError('listing buckets: Invalid Compact JWS')).toMatch(/didn't accept SUPABASE_SECRET_KEY/);
+    expect(explainStorageError('downloading a/b: Object not found')).toBe('downloading a/b: Object not found');
+  });
+});
+
+describe('record-backup: the /status page learns about each backup', () => {
+  const info = {
+    created_at: '2026-10-12T07:31:00Z',
+    dry_run: false,
+    database: true,
+    tables: 4,
+    files_included: true,
+    files: 12,
+    code_tag: 'backup/2026-10-12',
+  };
+
+  it('records the time and what the backup covered, once per workflow run', () => {
+    expect(recordValues(info, { GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2' })).toEqual({
+      run_id: '123-2',
+      created_at: '2026-10-12T07:31:00.000Z',
+      database: 'true',
+      files: 'true',
+      code: 'true',
+      tables: '4',
+      file_count: '12',
+    });
+  });
+
+  it('notes when stored files or the code tag were missing', () => {
+    const v = recordValues({ ...info, files_included: false, files: 0, code_tag: '' }, {});
+    expect(v).toMatchObject({ files: 'false', code: 'false', run_id: 'local-2026-10-12T07:31:00.000Z' });
+  });
+
+  it('records nothing for a dry run, and refuses a backup without a time', () => {
+    expect(recordValues({ ...info, dry_run: true }, {})).toBeNull();
+    expect(() => recordValues({ ...info, created_at: 'nope' }, {})).toThrow(/created_at/);
+  });
+
+  it("explains a database that doesn't have the kit's table yet", () => {
+    expect(explainRecordError('ERROR:  relation "bumper_lanes.backup_runs" does not exist')).toMatch(/Database changes → Run workflow/);
+    expect(explainRecordError('psql: error: connection to server failed: timeout')).toBe(
+      'the database said: error: connection to server failed: timeout',
+    );
+  });
+});
+
 const hasGpg = spawnSync('gpg', ['--version']).status === 0;
 
 describe.skipIf(!hasGpg)('backup.sh → restore.sh (dry run, needs gpg)', () => {
@@ -193,10 +285,21 @@ describe.skipIf(!hasGpg)('backup.sh → restore.sh (dry run, needs gpg)', () => 
 
   it('creates an encrypted backup that restore can open, and never leaks the passphrase', () => {
     out = mkdtempSync(join(tmpdir(), 'bk-'));
-    const backup = run('backup.sh', [out], { BACKUP_DRY_RUN: '1', BACKUP_PASSPHRASE: 'correct horse battery' });
+    const backup = run('backup.sh', [out], {
+      BACKUP_DRY_RUN: '1',
+      BACKUP_PASSPHRASE: 'correct horse battery',
+      BACKUP_CODE_TAG: 'backup/2026-10-12',
+    });
     expect(backup.status, backup.stdout + backup.stderr).toBe(0);
     expect(existsSync(join(out, 'data.tar.gz.gpg'))).toBe(true);
-    expect(JSON.parse(readFileSync(join(out, 'backup-info.json'), 'utf8'))).toMatchObject({ dry_run: true, tables: 1, files: 1 });
+    expect(JSON.parse(readFileSync(join(out, 'backup-info.json'), 'utf8'))).toMatchObject({
+      dry_run: true,
+      database: true,
+      tables: 1,
+      files_included: true,
+      files: 1,
+      code_tag: 'backup/2026-10-12',
+    });
     expect(readFileSync(join(out, 'data.tar.gz.gpg')).includes('hello')).toBe(false); // encrypted, not plain
     expect(backup.stdout + backup.stderr).not.toContain('correct horse battery');
 

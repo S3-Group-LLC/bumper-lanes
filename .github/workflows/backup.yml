@@ -9,11 +9,18 @@ name: Backup
 # Runs every night, whenever you (or the backup-now skill) start it, and automatically
 # before every database change and every restore (they call this workflow first).
 #
-# Secrets (GitHub → Settings → Secrets and variables → Actions):
+# Secrets (GitHub → Settings → Secrets and variables → Actions) — or ask your agent to
+# "connect backups" (npm run connect-backups):
 #   SUPABASE_DB_URL        Session pooler connection string (Supabase → Connect)
+#   SUPABASE_SECRET_KEY    secret key, to back up stored files (Supabase → Project Settings → API Keys)
 #   BACKUP_PASSPHRASE      a long password you choose; keep a copy somewhere safe
-#   SUPABASE_ACCESS_TOKEN  needed to back up stored files (supabase.com/dashboard/account/tokens)
-#   SUPABASE_PROJECT_REF   optional — worked out from SUPABASE_DB_URL if missing
+# Older setups: SUPABASE_ACCESS_TOKEN still works instead of SUPABASE_SECRET_KEY.
+#
+# Not set up yet? The run just notes it. Set up but something is missing or rejected? The
+# run saves what it can (your database first), then fails with the reason.
+#
+# Each saved backup is recorded in your database (bumper_lanes.backup_runs), so your
+# site's /status page shows when the last one ran.
 
 on:
   schedule:
@@ -24,6 +31,9 @@ on:
       artifact:
         description: Name of the saved backup
         value: ${{ jobs.backup.outputs.artifact }}
+      info:
+        description: What the backup covered (backup-info.json, one line)
+        value: ${{ jobs.backup.outputs.info }}
 
 permissions:
   contents: write # create the backup/YYYY-MM-DD tag
@@ -39,6 +49,7 @@ jobs:
       cancel-in-progress: false
     outputs:
       artifact: ${{ steps.save.outputs.artifact }}
+      info: ${{ steps.save.outputs.info }}
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -67,6 +78,7 @@ jobs:
           git tag -f "$tag" origin/main
           # Moves today's tag if it already exists; earlier days' tags are never changed.
           git push --quiet origin "+refs/tags/$tag"
+          echo "BACKUP_CODE_TAG=$tag" >> "$GITHUB_ENV"
           echo "Tagged $(git rev-parse --short origin/main) as $tag"
 
       - name: "2. Live site: deployments and setting names"
@@ -76,6 +88,9 @@ jobs:
 
       - name: Find the Supabase project
         if: env.SUPABASE_DB_URL != ''
+        # Only this step sees the key secret; it passes it on (masked) to later steps.
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/backup/supabase-project.mjs "$GITHUB_ENV"
 
       - name: Install the Supabase CLI
@@ -90,7 +105,7 @@ jobs:
 
       - name: "3. Data: skipped"
         if: env.SUPABASE_DB_URL == ''
-        run: echo "::notice::Data not backed up yet — add the SUPABASE_DB_URL and BACKUP_PASSPHRASE secrets to switch it on."
+        run: echo "::notice::Data not backed up yet — ask your agent to \"connect backups\" (or add the SUPABASE_DB_URL, SUPABASE_SECRET_KEY and BACKUP_PASSPHRASE secrets) to switch it on."
 
       - name: Save the backup
         id: save
@@ -99,6 +114,8 @@ jobs:
           kind=backup; [ -f "$OUT/data.tar.gz.gpg" ] || kind=backup-nodata
           echo "artifact=$kind-$(date -u +%Y-%m-%d)-run${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
           echo "days=$days" >> "$GITHUB_OUTPUT"
+          info="$(node -e 'try{console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))))}catch{console.log("")}' "$OUT/backup-info.json")"
+          echo "info=$info" >> "$GITHUB_OUTPUT"
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -107,6 +124,11 @@ jobs:
           path: ${{ env.OUT }}
           retention-days: ${{ steps.save.outputs.days }}
           if-no-files-found: error
+
+      # So your site's /status page can show when the last backup ran.
+      - name: Record it for the /status page
+        if: env.SUPABASE_DB_URL != ''
+        run: node scripts/backup/record-backup.mjs "$OUT/backup-info.json"
 
       - name: Summary
         run: |
@@ -118,4 +140,10 @@ jobs:
             else
               echo "Data: not included (Supabase not connected yet)."
             fi
+            if [ -n "${STORAGE_PROBLEM:-}" ]; then echo; echo "⚠️ **Stored files:** $STORAGE_PROBLEM"; fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Last, so the backup is saved first: a half-done backup must never look like a ✓.
+      - name: Everything backed up?
+        if: env.SUPABASE_DB_URL != ''
+        run: node scripts/backup/check-complete.mjs "$OUT/backup-info.json"

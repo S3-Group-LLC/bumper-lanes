@@ -1,6 +1,6 @@
 ---
 name: capture-learning
-description: End-of-session retro — looks at what took several tries or went wrong, and turns the lesson into a written improvement (a rule in AGENTS.md, an updated skill, or a new skill) proposed as a pull request, instead of "just remembering it". Use when the learner says "let's wrap up", "end of session", "what did we learn?", "remember this for next time", "don't make that mistake again", or after something needed several attempts.
+description: End-of-session retro — looks at what took several tries or went wrong, and turns the lesson into a written improvement (a rule in AGENTS.md, an updated skill, or a new skill) proposed as a pull request, instead of "just remembering it" — and records the session's significant decisions in DECISIONS.md. Use when the learner says "let's wrap up", "end of session", "what did we learn?", "remember this for next time", "don't make that mistake again", or after something needed several attempts.
 ---
 
 # Capture learning
@@ -24,6 +24,10 @@ Find the friction, from the conversation and from `git log --oneline -15` / `CHA
 Ask the learner too: "Was there anything you had to tell me more than once, or anything that
 felt harder than it should?" Pick the **one or two** lessons that matter most.
 
+Also list the **significant decisions** made this session (a tool or library, how data is
+organised, a security or privacy choice, a skipped rule) that aren't in `DECISIONS.md` yet, and
+propose an entry for each.
+
 ## 2. Choose where each lesson goes
 
 | The lesson is… | Put it in | Example |
@@ -32,6 +36,7 @@ felt harder than it should?" Pick the **one or two** lessons that matter most.
 | About **one kind of job** that already has a skill | That skill's `SKILL.md` | add-data: "Always add a `done` flag to to-do tables." |
 | A **repeated job** with no skill yet | A new skill — use **new-skill** | "Write the weekly newsletter." |
 | A **fact about the project** | `PROJECT.md` | "Orders close Friday 6pm." |
+| A **decision** and why it was made | `DECISIONS.md` (format at the top of the file) | "Chose email sign-in over passwords: simpler for customers." |
 | A one-off that won't happen again | Nothing — say so | — |
 
 Write the change **specifically**, as an instruction: not "be careful with fonts" but "Use the

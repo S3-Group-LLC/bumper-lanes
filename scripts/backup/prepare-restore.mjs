@@ -13,8 +13,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Supabase-managed tables that must never be overwritten from a backup. */
-export const SKIP_TABLES = new Set(['auth.schema_migrations']);
+/**
+ * Tables that must never be overwritten from a backup: Supabase's own, and the kit's
+ * record of past backups (restoring an old copy would hide the backups made since).
+ */
+export const SKIP_TABLES = new Set(['auth.schema_migrations', 'bumper_lanes.backup_runs']);
 
 const COPY_LINE = /^COPY\s+("?)([^".\s]+)\1\.("?)([^"\s(]+)\3[\s(]/;
 const SETVAL_LINE = /^SELECT pg_catalog\.setval\('("?)([^".]+)\1\./;

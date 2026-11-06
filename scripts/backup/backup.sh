@@ -7,8 +7,11 @@
 # Settings (environment variables — the workflow fills these from GitHub secrets):
 #   SUPABASE_DB_URL      database connection string (Session pooler)       — required
 #   BACKUP_PASSPHRASE    password used to encrypt the backup               — required
-#   SUPABASE_URL + SUPABASE_SECRET_KEY   needed to back up stored files    — optional
+#   SUPABASE_URL + SUPABASE_SECRET_KEY   needed to back up stored files (without them, or
+#                        if they're rejected, the database is still saved and
+#                        backup-info.json says why files were left out)
 #   BACKUP_DRY_RUN=1     no database needed: backs up sample data instead (for tests)
+#   BACKUP_CODE_TAG      the code tag made by the workflow, noted in backup-info.json — optional
 #
 # Writes <output-dir>/data.tar.gz.gpg and <output-dir>/backup-info.json.
 # Never prints secret values.
@@ -41,7 +44,12 @@ if [ "${BACKUP_DRY_RUN:-}" = "1" ]; then
 else
   say "Saving database roles, structure and rows…"
   # Supabase's recommended commands (supabase.com/docs/guides/deployment/ci/backups).
-  supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work/db/roles.sql" --role-only
+  if ! supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work/db/roles.sql" --role-only; then
+    say "ERROR: couldn't connect to your database with SUPABASE_DB_URL. It must be the Session"
+    say "pooler connection string (Supabase → Connect → Session pooler) with your database password"
+    say "filled in. If the project is paused, open it in Supabase to wake it up. Nothing was saved."
+    exit 1
+  fi
   supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work/db/schema.sql"
   supabase db dump --db-url "$SUPABASE_DB_URL" -f "$work/db/data.sql" --use-copy --data-only \
     -x "storage.buckets_vectors" -x "storage.vector_indexes"
@@ -66,17 +74,25 @@ else
 fi
 
 # 2. Stored files --------------------------------------------------------------
-files=0
+files=0 files_included=false storage_error=""
 if [ "${BACKUP_DRY_RUN:-}" = "1" ]; then
   mkdir -p "$work/storage/files/sample"
   printf 'sample file\n' > "$work/storage/files/sample/hello.txt"
   printf '[{"name":"sample","public":false,"file_size_limit":null,"allowed_mime_types":null}]\n' > "$work/storage/buckets.json"
   printf '[{"bucket":"sample","path":"hello.txt","mimetype":"text/plain"}]\n' > "$work/storage/files.json"
-  files=1
+  files=1 files_included=true
 elif [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SECRET_KEY:-}" ]; then
   say "Saving stored files…"
-  node "$here/storage.mjs" download "$work/storage"
-  files="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).length)' "$work/storage/files.json")"
+  if storage_log="$(node "$here/storage.mjs" download "$work/storage" 2>&1)"; then
+    echo "$storage_log"
+    files="$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).length)' "$work/storage/files.json")"
+    files_included=true
+  else
+    # Keep going: the database is still worth saving. The workflow fails at the end.
+    storage_error="$(printf '%s' "$storage_log" | tail -1)"
+    say "WARNING: stored files were NOT backed up — $storage_error"
+    rm -rf "$work/storage" && mkdir -p "$work/storage"
+  fi
 else
   say "Stored files skipped: SUPABASE_URL / SUPABASE_SECRET_KEY not available."
 fi
@@ -99,8 +115,12 @@ cat > "$out/backup-info.json" <<EOF
   "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "commit": "$(git rev-parse HEAD 2>/dev/null || echo unknown)",
   "dry_run": $([ "${BACKUP_DRY_RUN:-}" = "1" ] && echo true || echo false),
+  "database": true,
   "tables": $tables,
+  "files_included": $files_included,
   "files": $files,
+  "code_tag": "$(printf '%s' "${BACKUP_CODE_TAG:-}" | tr -cd 'A-Za-z0-9/._-')",
+  "storage_error": "$(printf '%s' "$storage_error" | tr -d '"\\' | tr '\n\t' '  ' | cut -c1-300)",
   "encrypted_bytes": $bytes
 }
 EOF

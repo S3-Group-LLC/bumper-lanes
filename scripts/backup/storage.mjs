@@ -100,6 +100,13 @@ export function countFiles(dir) {
   }
 }
 
+/** Says plainly when the problem is the key, which is the usual cause. */
+export function explainStorageError(message) {
+  return /jws|jwt|signature|invalid api key|invalid authentication|credentials|unauthori[sz]ed|forbidden|\b40[13]\b/i.test(message)
+    ? `Supabase didn't accept SUPABASE_SECRET_KEY (${message}). Copy the secret key again from Supabase → Project Settings → API Keys.`
+    : message;
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, dir] = process.argv.slice(2);
   const run = { download, upload }[command];
@@ -110,7 +117,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   run(dir)
     .then(({ buckets, files }) => console.log(`Storage ${command}: ${buckets} bucket(s), ${files} file(s).`))
     .catch((err) => {
-      console.error(`Storage ${command} failed: ${err.message}`);
+      console.error(`Storage ${command} failed: ${explainStorageError(err.message)}`);
       process.exit(1);
     });
 }

@@ -15,35 +15,42 @@ install.
 
 - A free **GitHub** account (stores your project)
 - A free **Vercel** account (puts your website online)
-- A free **Supabase** account (your database)
+- A free **Supabase** database (Vercel creates it for you — no separate sign-up)
 - **Claude Pro** or **ChatGPT Plus** (your AI agent)
 
-## Getting set up (about 30 minutes)
+## Getting set up (about 15 minutes)
+
+First create a **GitHub** account, then a **Vercel** account with **Continue
+with GitHub** (Hobby plan). Your database is created for you in step 3.
 
 1. **Copy this project.** Click the green **Use this template** button →
    **Create a new repository**. Choose **Private**.
-2. **Put it online.** In Vercel, click **Add New → Project** and import your new
-   repository. Vercel gives you a web address for your live site.
-3. **Add a database.** In Supabase, create a **New project** (turn **off**
-   "Automatically expose new tables", turn **on** "Enable automatic RLS"). Then,
-   in Vercel → **Settings → Environment Variables**, add
-   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
-   **Redeploy**. Your site's **/status** page will say **Database: Connected**.
-4. **Turn on backups.** In GitHub → **Settings → Secrets and variables →
-   Actions**, add `SUPABASE_DB_URL`, `BACKUP_PASSPHRASE` and
-   `SUPABASE_ACCESS_TOKEN` (the guides show where to find each one).
+2. **Put it online.** Open [vercel.com/new](https://vercel.com/new) and
+   **Import** your new repository (Vercel may offer it as "New repository
+   detected").
+3. **Add the database.** When Vercel suggests **Supabase**, click **Add** →
+   **Create New Supabase Account** → your region → **Supabase Free Plan** →
+   **Accept and Create** → connect it to **Production** and **Preview** (leave the
+   paid Preview Branch options unticked) → **Deploy**. Nothing to copy by hand.
+   Your site's **/status** page will say **Database: Connected**.
+4. **Turn on backups** (about 5 minutes, once your site is live). Ask your agent
+   to **"connect backups"**, or in GitHub → **Settings → Secrets and variables →
+   Actions**, add `SUPABASE_DB_URL`, `SUPABASE_SECRET_KEY` and
+   `BACKUP_PASSPHRASE` (the guides show where to find each one).
 5. **Open it with your agent** — pick one:
 
    **Claude Code** — go to **claude.ai/code**, connect GitHub, and pick your
    repository. That's it: setup runs by itself when the session starts (the
    first time can take a minute or two).
 
-   **Codex** — go to **chatgpt.com/codex** → **Settings → Environments →
-   Create environment**, and pick your repository. Then:
-   - In **Setup script**, paste: `bash scripts/setup.sh`
-   - If there's a **Maintenance script** box, paste the same line there too.
-   - If you see **Set package versions**, choose **Node.js 22**.
-   - Save, then start a task in that environment.
+   **Codex** — go to **chatgpt.com/codex**, start a task with **Work in →
+   Cloud** (not Local) → **Select environment → Create environment**, and pick
+   your repository → **Get started**. Then:
+   - If it asks how to set up, say: *"Use `bash scripts/setup.sh` as the install
+     script, with Node.js 22."*
+   - Turn on **Allow Codex to access internet** → **Package managers**, and add
+     the domains listed in the guide (GitHub, Supabase, Vercel).
+   - **Publish**, then start a new task in that environment.
 
 6. **Say hello.** Ask your agent: **"Run start-my-project."** It will interview
    you about your idea and write it down in `PROJECT.md`.
@@ -69,6 +76,7 @@ Your data is backed up every night and before every database change. Say
 | `PROJECT.md` | Your idea, in your words |
 | `AGENTS.md` | The rules your agent follows (its "employee handbook") |
 | `CHANGELOG.md` | A plain-English diary of every change |
+| `DECISIONS.md` | Why things are the way they are — the big choices and their trade-offs |
 | `GLOSSARY.md` | What all the new words mean |
 | `bumper-lanes.config.yaml` | A few settings (which agent, how long to keep backups) |
 | `src/` | Your website's code — your agent edits this |

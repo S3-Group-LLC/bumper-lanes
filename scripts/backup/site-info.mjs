@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Secrets the Bumper Lanes workflows use. Only whether each is set is recorded. */
-export const WORKFLOW_SECRETS = ['SUPABASE_DB_URL', 'SUPABASE_ACCESS_TOKEN', 'SUPABASE_PROJECT_REF', 'BACKUP_PASSPHRASE'];
+export const WORKFLOW_SECRETS = ['SUPABASE_DB_URL', 'SUPABASE_SECRET_KEY', 'BACKUP_PASSPHRASE', 'SUPABASE_ACCESS_TOKEN', 'SUPABASE_PROJECT_REF'];
 
 /** Setting names listed in .env.example (lines like NAME= or NAME=value). */
 export function envExampleNames(text) {

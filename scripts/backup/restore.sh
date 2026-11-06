@@ -78,6 +78,15 @@ if [ "$mode" = "full" ]; then
     --file "$work/restore/clear.sql" \
     --file "$work/restore/data.sql" \
     --file "$work/restore/migrations.sql" || failed
+  # The kit's own database settings (backup status, safe defaults) include things a backup
+  # can't carry, like the automatic-RLS trigger. The restored history says they're applied,
+  # so apply them again here — they're written to be safe to re-run.
+  for kit in "$here"/../../supabase/migrations/*_bumper_lanes_*.sql; do
+    [ -f "$kit" ] || continue
+    say "Re-applying the kit's database settings: $(basename "$kit")"
+    psql --no-psqlrc --quiet --variable ON_ERROR_STOP=1 --output /dev/null --dbname "$SUPABASE_DB_URL" \
+      --file "$kit" || failed
+  done
 else
   say "Replacing rows with the backed-up rows…"
   psql "${psql_args[@]}" \

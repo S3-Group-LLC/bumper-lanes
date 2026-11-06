@@ -1,6 +1,6 @@
 ---
 name: explain-that
-description: Tutor mode — explains in plain English what the agent just did, why, and what the learner should notice, and adds any new terms to GLOSSARY.md. Use when the learner asks "what did you just do?", "explain that", "why?", "what does that mean?", or seems confused by a word or step.
+description: Tutor mode — explains in plain English what the agent just did, why, and what the learner should notice, answers "why did we…?" from DECISIONS.md, and adds any new terms to GLOSSARY.md. Use when the learner asks "what did you just do?", "explain that", "why?", "why did we…?", "what does that mean?", or seems confused by a word or step.
 ---
 
 # Explain that
@@ -23,6 +23,10 @@ can be repeated). Keep it short — they can always ask for more.
 
 If they ask about something you didn't do in this session, look at `CHANGELOG.md` and the git
 history (`git log --oneline -10`) and explain that.
+
+For **"why did we…?"** questions, start with `DECISIONS.md`: give the reason, the other options
+and the trade-offs recorded there. If the decision isn't recorded, say so, explain what you can
+find, and offer to add an entry.
 
 ## Keep the glossary growing
 
