@@ -128,10 +128,26 @@ describe('connectBackups', () => {
     expect(steps).toMatch(/API Keys/);
     expect(steps).toMatch(/write it down/);
   });
+
+  it('explains how to get a database password when Vercel created the database', () => {
+    expect(manualSteps('a/b', ['SUPABASE_DB_URL'])).toMatch(/Reset database password/);
+  });
+
+  it('says what to save and where the full steps are', () => {
+    const steps = manualSteps('a/b', ['BACKUP_PASSPHRASE']);
+    expect(steps).toMatch(/Save your database password and backup passphrase/);
+    expect(steps).toContain('hellos3.com/bumper-lanes/get-started/add-secrets');
+  });
+
+  it('says what to run once the secrets are in, database changes first', () => {
+    const steps = manualSteps('a/b', ['BACKUP_PASSPHRASE']);
+    expect(steps.indexOf('Database changes')).toBeGreaterThan(-1);
+    expect(steps.indexOf('Database changes')).toBeLessThan(steps.indexOf('Actions → Backup'));
+  });
 });
 
 describe('doctor nudges until backups are on', () => {
-  it('warns with the missing names and the 5-minute fix', () => {
+  it('warns with the missing names and the 10-minute fix', () => {
     const r = backupCheck(['SUPABASE_DB_URL']);
     expect(r.status).toBe('warn');
     expect(r.detail).toContain('SUPABASE_SECRET_KEY, BACKUP_PASSPHRASE');

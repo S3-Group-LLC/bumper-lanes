@@ -9,6 +9,34 @@ Every database change is a **migration file** in `supabase/migrations/`. You nev
 the live database and never run the change yourself: after the learner merges, the
 **Database changes** workflow checks it, takes a backup, then applies it.
 
+## 0. Before the first database change: are backups on?
+
+The guide promises the learner that backups get set up before their first database change, so keep
+that promise. Look in `supabase/migrations/`: if any file isn't named `…_bumper_lanes_….sql`, an
+earlier change already went through, so skip to step 1.
+
+Otherwise check whether backups are on:
+
+1. Run `npm run connect-backups -- --check`. All ✓ means the secrets are set.
+2. If it can't tell (normal in the cloud), look at the **Backups** line on `<live address>/status`,
+   or ask the learner to. "Last backup: …" means they're on. Anything else means they aren't.
+
+**If they aren't on, stop before writing anything** and say something like:
+
+> "Before we change your database for the first time, let's turn on backups. Supabase's free plan
+> doesn't back up your data, so this is your safety net. It takes about ten minutes, and you add
+> three secrets in GitHub yourself, because I don't have permission to."
+
+Then run `npm run connect-backups` and relay its steps, with the full guide:
+https://hellos3.com/bumper-lanes/get-started/add-secrets. Remind them to save their database
+password and backup passphrase. Never ask for those values in the chat, and don't ask them to
+create a token. When they say the secrets are in, run `gh workflow run migrate.yml`, wait for it,
+use **backup-now**, then carry on with step 1. (If you can't run workflows, give them the guide's
+steps to run those two jobs.)
+
+If they want to wait, it's their call, but say plainly that a merged database change **won't be
+applied** until the secrets are in: **Database changes** stops with a red ✗.
+
 ## 1. Ask what to store and who may see it
 
 In plain English, find out:

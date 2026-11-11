@@ -53,7 +53,7 @@ function BackupRow({ backups }: { backups: BackupHealth | null }) {
       {backups.state === "none" &&
         "No backup recorded yet. Backups run every night once they're switched on — ask your agent to run doctor."}
       {backups.state === "not-set-up" &&
-        "Not set up in the database yet. On GitHub: Actions → Database changes → Run workflow (or ask your agent to run doctor)."}
+        'Not switched on yet. That\'s fine until your first database change: your agent will walk you through it first. To do it now, ask your agent to "connect backups".'}
       {backups.state === "unknown" && `Couldn't check: ${backups.reason}`}
     </Row>
   );

@@ -70,4 +70,5 @@ move on happily.
 ## 5. Next step
 
 Offer to start building the first version. A good first move is often the home page, then
-**add-data** for the first kind of information, then **ship-it** to see a preview.
+**add-data** for the first kind of information (it sets up backups first, about ten minutes), then
+**ship-it** to see a preview.

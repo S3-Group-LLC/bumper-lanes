@@ -77,7 +77,7 @@ your eyes (copy `tests/example.test.ts`). `npm test` includes the safety checks;
 
 ### 6. Database changes only through migration files
 - Every change to the database (new table, new column, new rule) is a new SQL
-  file in `supabase/migrations/` — use the `add-data` skill.
+  file in `supabase/migrations/` — use the `add-data` skill (it switches backups on first).
 - Every new table must turn on **Row Level Security** and have policies saying
   who can read and write. CI checks this.
 - You never connect to the live database directly and never hold its password.
@@ -130,7 +130,8 @@ renaming or removing a skill, run `npm run sync:skills`, then `npm run check:ski
 - **Hosting:** Vercel. Every pull request gets a preview link; `main` is the live site.
 - **Backups:** `.github/workflows/backup.yml` (nightly, manual, and before database changes) and
   `restore.yml` (needs the word `RESTORE`). Use the `backup-now`, `restore` and `undo` skills.
-  Not switched on yet? `npm run connect-backups` sets the GitHub secrets, or explains how.
+  Off until just before the first database change (see `add-data`): `npm run connect-backups`. In
+  the cloud you can't add GitHub secrets, so give the learner its steps; don't ask for a token.
 - **Data:** Supabase. Settings come from `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (set in Vercel).
 

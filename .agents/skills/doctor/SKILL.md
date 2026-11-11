@@ -45,21 +45,34 @@ comment), then:
 | ✗ "Could not reach Supabase" | The address is wrong | Copy the **Project URL** again from Supabase → **Project Settings → API**, update `NEXT_PUBLIC_SUPABASE_URL` in Vercel, redeploy. |
 
 The **Backups** line: ✓ "Last backup: …" is fine. ⚠ "days old" → check the latest **Backup** run
-(step 3). ⚠ "Stored files weren't included" → a storage secret is missing (step 3). ○ "Not set up
-in the database yet" → GitHub → **Actions → Database changes → Run workflow** (once the secrets
-in step 3 are set). ○ "No backup recorded yet" → run **backup-now**.
+(step 3). ⚠ "Stored files weren't included" → a storage secret is missing (step 3). ○ "Not switched
+on yet" → fine until the first database change. If the secrets in step 3 are already set, GitHub →
+**Actions → Database changes → Run workflow**. ○ "No backup recorded yet" → run **backup-now**.
 
 ## 3. Check GitHub secrets (for backups and database changes)
 
 Needed names: `SUPABASE_DB_URL`, `SUPABASE_SECRET_KEY`, `BACKUP_PASSPHRASE`. Older setups may have
-`SUPABASE_ACCESS_TOKEN` instead of `SUPABASE_SECRET_KEY` — that still works. Backups are optional
-until the site is live, but keep reminding the learner until they're on.
+`SUPABASE_ACCESS_TOKEN` instead of `SUPABASE_SECRET_KEY` — that still works. Backups aren't needed
+until the first database change, so if there are no database changes of the learner's own yet, just
+mention that **add-data** sets them up first. Once there are, keep reminding them until they're on.
 
 **To switch them on, run `npm run connect-backups`.** It sets what it can with `gh secret set`
 (reading the database address and secret key from Vercel when it can), asks the learner to type
 the rest into a hidden prompt when there's a terminal they can type in, and otherwise prints
 click-by-click steps — relay those. `npm run connect-backups -- --check` lists which are set
 (names only).
+
+**In the cloud you can't add secrets**: your GitHub access can run workflows but not manage
+secrets. That's expected, so don't ask the learner to create a personal access token or change your
+environment's settings to get around it. A token is a long-lived key, and the secrets include their
+database password; adding them straight into GitHub is safer and takes about ten minutes. If they
+ask you to do it anyway, say that in one sentence, then give the steps. Point them to the full
+guide: https://hellos3.com/bumper-lanes/get-started/add-secrets
+
+Before they start, tell them to **save their database password and backup passphrase somewhere
+safe** (a password manager is ideal): neither can be read back later, and nobody can open their
+backups without the passphrase. Once they've added the secrets, run `gh workflow run migrate.yml`,
+wait for it, then use **backup-now** and report what happened.
 
 - If you can reach GitHub, try `gh secret list` — it shows names only, never values.
   You may not have permission; that's fine.
@@ -72,7 +85,10 @@ variables** → **Actions** → **New repository secret** → name exactly as ab
 value → **Add secret**. Where each value comes from:
 
 - `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler** connection string, with the
-  database password filled in (the "direct" one won't work from GitHub).
+  database password filled in (the "direct" one won't work from GitHub). The learner opens
+  Supabase from Vercel: project → **Storage** → **Open in Supabase**. If Vercel created the
+  database they've never had a password: Supabase → **Database → Settings → Reset database
+  password → Generate a password**. The starter app doesn't use it, so resetting is safe.
 - `BACKUP_PASSPHRASE`: a long sentence the learner makes up and **writes down somewhere safe**.
 - `SUPABASE_SECRET_KEY`: Supabase → **Project Settings → API Keys** → **Secret keys** → copy
   (or create one).

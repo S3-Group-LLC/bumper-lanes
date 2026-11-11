@@ -25,7 +25,7 @@ export const SECRETS = ['SUPABASE_DB_URL', 'SUPABASE_SECRET_KEY', 'BACKUP_PASSPH
 
 const WHERE = {
   SUPABASE_DB_URL:
-    'Supabase → your project → Connect → Session pooler → copy the URI and replace [YOUR-PASSWORD] with your database password',
+    'Supabase (from Vercel: your project → Storage → Open in Supabase) → Connect → Session pooler → copy the URI and replace [YOUR-PASSWORD] with your database password. If Vercel created your database you won\'t have one yet: Supabase → Database → Settings → Reset database password → Generate a password, and keep it somewhere safe',
   SUPABASE_SECRET_KEY: 'Supabase → Project Settings → API Keys → Secret keys → copy (or create one)',
   BACKUP_PASSPHRASE: 'a long sentence you make up — write it down somewhere safe; nobody can open your backups without it',
 };
@@ -87,6 +87,9 @@ export function checkValue(name, value) {
   return null;
 }
 
+const AFTER_CONNECTING =
+  'Next: run GitHub → Actions → Database changes → Run workflow, then Actions → Backup → Run workflow (or ask your agent to run them).';
+
 /** Click-by-click steps for the secrets still missing. */
 export function manualSteps(repo, missing) {
   const page = repo ? `https://github.com/${repo}/settings/secrets/actions/new` : 'your repository → Settings → Secrets and variables → Actions → New repository secret';
@@ -94,7 +97,10 @@ export function manualSteps(repo, missing) {
     'Add these in GitHub (names exactly as written):',
     `  Open ${page}`,
     ...missing.map((n, i) => `  ${i + 1}. Name: ${n}\n     Secret: ${WHERE[n]}\n     → Add secret`),
-    'Never paste these into a chat — only into GitHub.',
+    'Never paste these into a chat — only into GitHub. No token or extra access is needed.',
+    'Save your database password and backup passphrase somewhere safe: neither can be read back later.',
+    'Full steps: https://hellos3.com/bumper-lanes/get-started/add-secrets',
+    AFTER_CONNECTING,
   ].join('\n');
 }
 
@@ -147,7 +153,7 @@ export async function connectBackups({ root, run = defaultRun, ask = hiddenPromp
   const needed = SECRETS.filter((n) => !secretIsSet(have, n));
   for (const n of SECRETS.filter((n) => !needed.includes(n))) log(`✓ ${n} is already set`);
   if (!needed.length) {
-    log('\nBackups are connected. Run one now: GitHub → Actions → Backup → Run workflow (or ask your agent: "backup now").');
+    log(`\nBackups are connected. ${AFTER_CONNECTING}`);
     return { set: [], manual: [] };
   }
   if (!gh) {
@@ -202,7 +208,7 @@ export async function connectBackups({ root, run = defaultRun, ask = hiddenPromp
     log(`\n${manual.length === needed.length ? "I couldn't add the secrets from here." : 'A few are left for you.'}\n`);
     log(manualSteps(repo, manual));
   } else {
-    log('\nBackups are connected. Run one now: GitHub → Actions → Backup → Run workflow (or ask your agent: "backup now").');
+    log(`\nBackups are connected. ${AFTER_CONNECTING}`);
   }
   return { set, manual };
 }

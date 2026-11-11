@@ -33,11 +33,7 @@ with GitHub** (Hobby plan). Your database is created for you in step 3.
    **Accept and Create** → connect it to **Production** and **Preview** (leave the
    paid Preview Branch options unticked) → **Deploy**. Nothing to copy by hand.
    Your site's **/status** page will say **Database: Connected**.
-4. **Turn on backups** (about 5 minutes, once your site is live). Ask your agent
-   to **"connect backups"**, or in GitHub → **Settings → Secrets and variables →
-   Actions**, add `SUPABASE_DB_URL`, `SUPABASE_SECRET_KEY` and
-   `BACKUP_PASSPHRASE` (the guides show where to find each one).
-5. **Open it with your agent** — pick one:
+4. **Open it with your agent** — pick one:
 
    **Claude Code** — go to **claude.ai/code**, connect GitHub, and pick your
    repository. That's it: setup runs by itself when the session starts (the
@@ -52,11 +48,30 @@ with GitHub** (Hobby plan). Your database is created for you in step 3.
      the domains listed in the guide (GitHub, Supabase, Vercel).
    - **Publish**, then start a new task in that environment.
 
-6. **Say hello.** Ask your agent: **"Run start-my-project."** It will interview
+5. **Say hello.** Ask your agent: **"Run start-my-project."** It will interview
    you about your idea and write it down in `PROJECT.md`.
 
 Stuck? Ask your agent to **"run doctor"** — it checks your setup and tells you
 what to fix, in plain English. You can also open your site's **/status** page.
+
+## Before your first database change: turn on backups
+
+You don't need this on day one, because your database starts empty. **The first time your project
+needs to store information, your agent stops and walks you through it** (about 10 minutes).
+
+In the cloud your agent can't add GitHub secrets, so you add these three yourself: GitHub →
+**Settings → Secrets and variables → Actions → New repository secret**. Say **"connect backups"** for
+a direct link, then follow the steps at https://hellos3.com/bumper-lanes/get-started/add-secrets
+
+- `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler**, with your database password in
+  place of `[YOUR-PASSWORD]`. Vercel created your database, so first set a password: Supabase →
+  **Database → Settings → Reset database password**.
+- `SUPABASE_SECRET_KEY`: Supabase → **Project Settings → API Keys → Secret keys**.
+- `BACKUP_PASSPHRASE`: a sentence of at least 20 characters that you make up.
+
+**Save your database password and backup passphrase somewhere safe.** You can't read them back
+later, and nobody can open your backups without the passphrase. Then ask your agent to run
+**Database changes** and **Backup**, and check they worked.
 
 ## How building works
 
@@ -66,8 +81,8 @@ what to fix, in plain English. You can also open your site's **/status** page.
 4. Happy? **Merge** the pull request. **Merging publishes** it to your live site.
 5. Not happy? Ask for changes, or say **"undo"**.
 
-Your data is backed up every night and before every database change. Say
-**"backup now"** any time, or **"restore"** to go back to an earlier backup.
+Once backups are on, your data is backed up every night and before every database
+change. Say **"backup now"** any time, or **"restore"** to go back to an earlier backup.
 
 ## What's in this folder
 

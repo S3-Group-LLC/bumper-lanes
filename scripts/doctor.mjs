@@ -69,7 +69,7 @@ export function backupCheck(have) {
   }
   const missing = SECRETS.filter((n) => !secretIsSet(have, n));
   return missing.length
-    ? warn('Backups', `not switched on yet (missing ${missing.join(', ')})`, 'Takes about 5 minutes: run npm run connect-backups (or ask: "connect backups").')
+    ? warn('Backups', `not switched on yet (missing ${missing.join(', ')}) — needed before your first database change`, 'Takes about 10 minutes: run npm run connect-backups (or ask: "connect backups").')
     : ok('Backups', 'switched on (the GitHub secrets are set)');
 }
 
